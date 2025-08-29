@@ -1,0 +1,35 @@
+root = "."
+tmp_dir = "tmp"
+
+
+[build]
+# Comando de compilación (salida en ./tmp/main)
+cmd = "go build -o ./tmp/main ."
+bin = "tmp/main"
+
+# Extensiones de archivo que disparan el reload
+include_ext = ["go", "env", "yaml", "yml"]
+
+# Ignorar directorios que cambian mucho o no importan
+exclude_dir = ["assets", "tmp", "vendor"]
+
+# Si falla el build, detén la ejecución del binario anterior
+stop_on_error = true
+
+[log]
+time = true
+main_only = true
+
+[color]
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+# Limpia tmp al salir
+clean_on_exit = true
+
+[screen]
+# Limpia pantalla en cada rebuild
+clear_on_rebuild = true
