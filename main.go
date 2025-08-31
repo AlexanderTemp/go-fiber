@@ -19,7 +19,6 @@ func main() {
 		log.Fatal("❌ Error conectando a ClickHouse:", err)
 	}
 	log.Println("✅ Conexión establecida con ClickHouse")
-	defer conn.Close()
 
 	bitacoraRepo := repository.NewBitacoraRepository(conn)
 	bitacoraService := services.NewBitacoraService(bitacoraRepo)
