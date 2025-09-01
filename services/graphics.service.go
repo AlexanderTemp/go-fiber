@@ -35,3 +35,19 @@ func (s *BitacoraService) ObtenerTendenciaConsumo(ctx context.Context, filtros d
 
 	return res, nil
 }
+
+func (s *BitacoraService) ObtenerDatosExtra(ctx context.Context, filtros dto.FiltroExtraDto) (interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Panic recuperado en ObtenerDatosExtra:", r)
+		}
+	}()
+
+	res, err := s.bitacoraRepo.ObtenerDatosExtra(ctx, filtros)
+	if err != nil {
+		log.Println("Error al obtener datos extra:", err)
+		return []map[string]interface{}{}, err
+	}
+
+	return res, nil
+}

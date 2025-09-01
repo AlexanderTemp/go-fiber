@@ -14,4 +14,8 @@ func Routes(router fiber.Router, bitacoraService *services.BitacoraService) {
 	router.Get("/tendencia", func(c *fiber.Ctx) error {
 		return handlers.TendenciaConsumo(c, bitacoraService)
 	})
+
+	router.Get("/extra", func(c *fiber.Ctx) error {
+		return handlers.ObtenerDatosExtra(c, bitacoraService)
+	})
 }

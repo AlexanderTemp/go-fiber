@@ -22,11 +22,103 @@ func NewBitacoraRepository(conn clickhouse.Conn) *BitacoraRepository {
 	return &BitacoraRepository{conn: conn}
 }
 
+type ServicioData struct {
+	Fecha         time.Time `json:"fecha"`
+	Transacciones uint64    `json:"transacciones"`
+}
+
+type ServicioResultado struct {
+	Servicio string         `json:"servicio"`
+	Data     []ServicioData `json:"data"`
+	Total    uint64         `json:"total"`
+}
+
+func (r *BitacoraRepository) ObtenerDatosExtra(ctx context.Context, filtros dto.FiltroExtraDto) ([]ServicioResultado, error) {
+	condiciones := make([]string, 0, 4)
+
+	if filtros.EntidadConsumidora != nil {
+		condiciones = append(condiciones, fmt.Sprintf("entidadConsumidora = %d", *filtros.EntidadConsumidora))
+	}
+	if filtros.EntidadPublicadora != nil {
+		condiciones = append(condiciones, fmt.Sprintf("entidadPublicadora = %d", *filtros.EntidadPublicadora))
+	}
+	if filtros.SistemaConsumidor != nil {
+		condiciones = append(condiciones, fmt.Sprintf("sistemaConsumidor = %d", *filtros.SistemaConsumidor))
+	}
+	if filtros.Servicio != nil {
+		condiciones = append(condiciones, fmt.Sprintf("servicio = %d", *filtros.Servicio))
+	}
+
+	whereClause := "WHERE 1 = 1"
+	if len(condiciones) > 0 {
+		whereClause = "WHERE " + strings.Join(condiciones, " AND ")
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			toString(servicio) AS servicioId,
+			toDate(fechayHora) AS fecha,
+			countDistinct(idTransaccion) AS transacciones
+		FROM bitacora
+		%s
+		AND fechayHora >= today() - INTERVAL 30 DAY
+		GROUP BY servicioId, fecha
+		ORDER BY servicioId, fecha
+	`, whereClause)
+
+	rows, err := r.conn.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error en query: %w", err)
+	}
+	defer rows.Close()
+
+	dataPorServicio := make(map[string][]ServicioData)
+
+	for rows.Next() {
+		var servicioId string
+		var fecha time.Time
+		var transacciones uint64
+
+		if err := rows.Scan(&servicioId, &fecha, &transacciones); err != nil {
+			return nil, fmt.Errorf("error en scan: %w", err)
+		}
+
+		dataPorServicio[servicioId] = append(dataPorServicio[servicioId], ServicioData{
+			Fecha:         fecha,
+			Transacciones: transacciones,
+		})
+	}
+
+	servicios := make([]ServicioResultado, 0, len(dataPorServicio))
+	for servicio, data := range dataPorServicio {
+		var total uint64
+		for _, d := range data {
+			total += d.Transacciones
+		}
+		servicios = append(servicios, ServicioResultado{
+			Servicio: servicio,
+			Data:     data,
+			Total:    total,
+		})
+	}
+
+	sort.Slice(servicios, func(i, j int) bool {
+		return servicios[i].Total > servicios[j].Total
+	})
+
+	if len(servicios) > 4 {
+		servicios = servicios[:4]
+	}
+
+	return servicios, nil
+}
+
 func (r *BitacoraRepository) ObtenerDatosTendencia(ctx context.Context, filtros dto.FiltroTendenciaConsumoDto) (map[string]interface{}, error) {
 	condiciones := []string{}
 	params := map[string]any{}
 
 	var fechaInicio, fechaFin time.Time
+
 	if filtros.FechaInicio != nil && filtros.FechaFin != nil {
 		fechaInicio = *filtros.FechaInicio
 		fechaFin = *filtros.FechaFin
